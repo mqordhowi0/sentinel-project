@@ -1,0 +1,11 @@
+# Abaikan file environment/password
+.env
+
+# Abaikan folder hasil build/sampah sistem
+/target
+/dist
+*.exe
+*.exe~
+
+# Abaikan folder IDE
+.vscode
