@@ -7,3 +7,4 @@ edition = "2024"
 reqwest = { version = "0.13.1", features = ["blocking"] }
 sqlx = { version = "0.8.6", features = ["postgres", "runtime-tokio-native-tls"] }
 tokio = { version = "1.49.0", features = ["full"] }
+warp = "0.4.2"
