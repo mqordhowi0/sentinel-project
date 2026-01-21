@@ -1,18 +1,46 @@
-# Tahap 1: Memasak (Build)
-FROM rust:1.75-slim-bookworm as builder
+# ========================
+# TAHAP 1: Masak Golang (API)
+# ========================
+FROM golang:1.23-alpine AS go-builder
 WORKDIR /app
+COPY go.mod go.sum ./
+RUN go mod download
 COPY . .
+RUN go build -o server main.go
+
+# ========================
+# TAHAP 2: Masak Rust (Worker)
+# ========================
+# Kita butuh image Rust
+FROM rust:1.75-slim-bookworm as rust-builder
+WORKDIR /app
+# Kita copy source code Rust dari folder scanner-worker
+# (Nanti kita atur context-nya di Koyeb biar bisa lihat folder sebelah)
+COPY scanner-worker/ . 
 RUN cargo build --release
 
-# Tahap 2: Menyajikan (Run)
+# ========================
+# TAHAP 3: Sajikan (Final Image)
+# ========================
 FROM debian:bookworm-slim
+
 WORKDIR /app
-# Kita butuh library OpenSSL supaya bisa konek ke Neon (HTTPS)
+
+# Install library penting (SSL & CA Certificates) biar bisa konek DB
 RUN apt-get update && apt-get install -y libssl-dev ca-certificates && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /app/target/release/scanner-worker .
+# Ambil hasil masakan Golang
+COPY --from=go-builder /app/server .
+COPY --from=go-builder /app/start.sh .
 
-# Buka port 8080 (Untuk health check Koyeb)
+# Ambil hasil masakan Rust
+COPY --from=rust-builder /app/target/release/scanner-worker .
+
+# Beri izin eksekusi ke script start.sh
+RUN chmod +x start.sh
+
+# Buka port 8080 (Pintu utama)
 EXPOSE 8080
 
-CMD ["./scanner-worker"]
+# Jalankan Mandor!
+CMD ["./start.sh"]
