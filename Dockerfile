@@ -8,7 +8,7 @@ COPY api-service/ .
 RUN go build -o server main.go
 
 # === TAHAP 2: Masak Rust (Worker) ===
-FROM rust:1.84-slim-bookworm as rust-builder
+FROM rust:slim-bookworm as rust-builder
 WORKDIR /app
 # Ambil bahan dari folder scanner-worker
 COPY scanner-worker/ .
