@@ -1,20 +1,16 @@
 use sqlx::postgres::PgPoolOptions;
-use sqlx::Row; // PENTING: Kita butuh ini buat baca data manual
+use sqlx::Row;
 use std::time::Duration;
 use tokio::time::sleep;
-use warp::Filter;
+// Hapus baris "use warp..." karena kita tidak butuh server di worker
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // === Bagian 1: Server Palsu (Biar Koyeb Happy) ===
-    let health_route = warp::any().map(|| "Worker is running safely!".to_string());
     
-    tokio::spawn(async move {
-        println!("🎭 Dummy Server jalan di port 8080");
-        warp::serve(health_route).run(([0, 0, 0, 0], 8080)).await;
-    });
-
-    // === Bagian 2: Koneksi Database ===
+    // === BAGIAN DUMMY SERVER KITA HAPUS TOTAL ===
+    // (Worker tidak perlu membuka port, dia cuma perlu jalan di background)
+    
+    // === Koneksi Database ===
     let database_url = std::env::var("DATABASE_URL")
         .expect("DATABASE_URL wajib diisi!");
 
@@ -23,25 +19,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .connect(&database_url)
         .await?;
 
-    println!("🤖 Sentinel Worker: SIAP MEMBURU LINK BERBAHAYA!");
+    println!("🤖 Sentinel Worker: SIAP MEMBURU LINK BERBAHAYA! (Mode Silent)");
 
     loop {
-        // === PERUBAHAN PENTING DI SINI ===
-        // Kita pakai sqlx::query (bukan query!) supaya tidak perlu konek DB saat build
+        // Cari link yang statusnya 'pending'
         let row = sqlx::query("SELECT id, url FROM links WHERE status = 'pending' LIMIT 1")
             .fetch_optional(&pool)
             .await?;
 
         match row {
             Some(record) => {
-                // Ambil data secara manual
                 let id: i32 = record.get("id");
                 let url: String = record.get("url");
 
                 println!("🔎 Sedang memeriksa: {}", url);
                 let status_hasil = cek_link(&url);
                 
-                // Update status juga pakai query biasa (tanpa tanda seru)
+                // Update status
                 sqlx::query("UPDATE links SET status = $1 WHERE id = $2")
                     .bind(status_hasil.clone())
                     .bind(id)
@@ -51,6 +45,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("✅ Selesai! Status diubah jadi: {}", status_hasil);
             }
             None => {
+                // Kalau tidak ada tugas, tidur 3 detik
                 sleep(Duration::from_secs(3)).await;
             }
         }
