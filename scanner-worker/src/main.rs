@@ -7,7 +7,7 @@ use warp::Filter;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // === Bagian 1: Server Palsu (Biar Koyeb Happy) ===
-    let health_route = warp::any().map(|| "Worker is running safely!");
+    let health_route = warp::any().map(|| "Worker is running safely!".to_string());
     
     tokio::spawn(async move {
         println!("🎭 Dummy Server jalan di port 8080");
