@@ -1,25 +1,20 @@
 use sqlx::postgres::PgPoolOptions;
+use sqlx::Row; // PENTING: Kita butuh ini buat baca data manual
 use std::time::Duration;
 use tokio::time::sleep;
-use warp::Filter; // Library buat server palsu
-
-// Pastikan DATABASE_URL nanti diambil dari Environment Variable
-// (Kita tidak perlu hardcode di sini lagi karena nanti diset di Koyeb)
+use warp::Filter;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // === BAGIAN 1: SIAPKAN SERVER PALSU (TOPENG) ===
-    // Ini supaya Koyeb melihat aplikasi kita "Healthy" di port 8080
+    // === Bagian 1: Server Palsu (Biar Koyeb Happy) ===
     let health_route = warp::any().map(|| "Worker is running safely!");
     
-    // Jalankan server di background (tanpa menghentikan scanning)
     tokio::spawn(async move {
         println!("🎭 Dummy Server jalan di port 8080");
         warp::serve(health_route).run(([0, 0, 0, 0], 8080)).await;
     });
 
-    // === BAGIAN 2: LOGIKA SCANNER ASLI ===
-    // Ambil URL database dari Environment Variable (Settingan Koyeb)
+    // === Bagian 2: Koneksi Database ===
     let database_url = std::env::var("DATABASE_URL")
         .expect("DATABASE_URL wajib diisi!");
 
@@ -31,24 +26,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("🤖 Sentinel Worker: SIAP MEMBURU LINK BERBAHAYA!");
 
     loop {
-        let row = sqlx::query!(
-            r#"SELECT id, url FROM links WHERE status = 'pending' LIMIT 1"#
-        )
-        .fetch_optional(&pool)
-        .await?;
+        // === PERUBAHAN PENTING DI SINI ===
+        // Kita pakai sqlx::query (bukan query!) supaya tidak perlu konek DB saat build
+        let row = sqlx::query("SELECT id, url FROM links WHERE status = 'pending' LIMIT 1")
+            .fetch_optional(&pool)
+            .await?;
 
         match row {
             Some(record) => {
-                println!("🔎 Sedang memeriksa: {}", record.url);
-                let status_hasil = cek_link(&record.url);
+                // Ambil data secara manual
+                let id: i32 = record.get("id");
+                let url: String = record.get("url");
+
+                println!("🔎 Sedang memeriksa: {}", url);
+                let status_hasil = cek_link(&url);
                 
-                sqlx::query!(
-                    r#"UPDATE links SET status = $1 WHERE id = $2"#,
-                    status_hasil,
-                    record.id
-                )
-                .execute(&pool)
-                .await?;
+                // Update status juga pakai query biasa (tanpa tanda seru)
+                sqlx::query("UPDATE links SET status = $1 WHERE id = $2")
+                    .bind(status_hasil.clone())
+                    .bind(id)
+                    .execute(&pool)
+                    .await?;
 
                 println!("✅ Selesai! Status diubah jadi: {}", status_hasil);
             }
